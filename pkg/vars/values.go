@@ -1,4 +1,4 @@
-package environments
+package vars
 
 import (
 	"bufio"
