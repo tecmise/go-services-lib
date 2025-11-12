@@ -69,6 +69,16 @@ func IsDebugEnabled() bool {
 	return false
 }
 
+func IsProduction() bool {
+	if val := os.Getenv("ENVIRONMENT"); val != "" {
+		return strings.ToLower(strings.TrimSpace(val)) == "production"
+	}
+	if v, ok := readDotEnvVar("ENVIRONMENT"); ok {
+		return strings.ToLower(strings.TrimSpace(v)) == "production"
+	}
+	return false
+}
+
 func readDotEnvVar(param string) (string, bool) {
 	f, err := os.Open(".env")
 	if err != nil {
