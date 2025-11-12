@@ -1,22 +1,30 @@
 package environments
 
 import (
+	"bufio"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func GetStringValue(param string) string {
-	val := os.Getenv(param)
-	if val == "" {
-		panic("environment variable " + param + " is not set")
+	if val := os.Getenv(param); val != "" {
+		return val
 	}
-	return val
+	if v, ok := readDotEnvVar(param); ok {
+		return v
+	}
+	panic("environment variable " + param + " is not set")
 }
 
 func getIntValue(param string) *int {
 	val := os.Getenv(param)
 	if val == "" {
-		return nil
+		if v, ok := readDotEnvVar(param); ok {
+			val = v
+		} else {
+			return nil
+		}
 	}
 	intVal, err := strconv.Atoi(val)
 	if err != nil {
@@ -34,11 +42,13 @@ func GetIntValue(param string) int {
 }
 
 func GetStringValueDefault(param string, _default string) string {
-	val := GetStringValue(param)
-	if val == "" {
-		return _default
+	if val := os.Getenv(param); val != "" {
+		return val
 	}
-	return val
+	if v, ok := readDotEnvVar(param); ok {
+		return v
+	}
+	return _default
 }
 
 func GetIntValueDefault(param string, _default int) int {
@@ -47,4 +57,37 @@ func GetIntValueDefault(param string, _default int) int {
 		return _default
 	}
 	return *val
+}
+
+func readDotEnvVar(param string) (string, bool) {
+	f, err := os.Open(".env")
+	if err != nil {
+		return "", false
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		if key != param {
+			continue
+		}
+		val := strings.TrimSpace(parts[1])
+		if len(val) >= 2 {
+			if (strings.HasPrefix(val, "\"") && strings.HasSuffix(val, "\"")) ||
+				(strings.HasPrefix(val, "'") && strings.HasSuffix(val, "'")) {
+				val = val[1 : len(val)-1]
+			}
+		}
+		return val, true
+	}
+	return "", false
 }
