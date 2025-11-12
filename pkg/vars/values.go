@@ -59,6 +59,38 @@ func GetIntValueDefault(param string, _default int) int {
 	return *val
 }
 
+func getFloat64Value(param string) *float64 {
+	val := os.Getenv(param)
+	if val == "" {
+		if v, ok := readDotEnvVar(param); ok {
+			val = v
+		} else {
+			return nil
+		}
+	}
+	floatVal, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		panic("environment variable " + param + " is not a valid float64")
+	}
+	return &floatVal
+}
+
+func GetFloat64Value(param string) float64 {
+	val := getFloat64Value(param)
+	if val == nil {
+		panic("environment variable " + param + " is not set")
+	}
+	return *val
+}
+
+func GetFloat64ValueDefault(param string, _default float64) float64 {
+	val := getFloat64Value(param)
+	if val == nil {
+		return _default
+	}
+	return *val
+}
+
 func IsDebugEnabled() bool {
 	if val := os.Getenv("DEBUG"); val != "" {
 		return strings.ToLower(strings.TrimSpace(val)) == "true"
