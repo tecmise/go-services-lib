@@ -59,6 +59,16 @@ func GetIntValueDefault(param string, _default int) int {
 	return *val
 }
 
+func IsDebugEnabled() bool {
+	if val := os.Getenv("DEBUG"); val != "" {
+		return strings.ToLower(strings.TrimSpace(val)) == "true"
+	}
+	if v, ok := readDotEnvVar("DEBUG"); ok {
+		return strings.ToLower(strings.TrimSpace(v)) == "true"
+	}
+	return false
+}
+
 func readDotEnvVar(param string) (string, bool) {
 	f, err := os.Open(".env")
 	if err != nil {
