@@ -18,6 +18,7 @@ type (
 		GetFloat64ValueDefault(param string, _default float64) float64
 		IsDebugEnabled() bool
 		IsProduction() bool
+		CheckMount() []string
 	}
 
 	configuration struct {
@@ -25,6 +26,37 @@ type (
 		context    string
 	}
 )
+
+func (c *configuration) CheckMount() []string {
+	secretStorePath := "/mnt/secrets-store"
+
+	// Verificar se o diretório existe
+	_, err := os.Stat(secretStorePath)
+	if err != nil {
+		return []string{}
+	}
+
+	// Listar arquivos no diretório
+	entries, err := os.ReadDir(secretStorePath)
+	if err != nil {
+		return []string{}
+	}
+
+	// Construir o prefixo esperado
+	prefix := fmt.Sprintf("_%s_%s_", c.repository, c.context)
+
+	// Filtrar arquivos que começam com o prefixo
+	var files []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) {
+			// Remover o prefixo do nome do arquivo
+			paramName := strings.TrimPrefix(entry.Name(), prefix)
+			files = append(files, paramName)
+		}
+	}
+
+	return files
+}
 
 func NewConfiguration(repository string, context string) Configuration {
 	return &configuration{
