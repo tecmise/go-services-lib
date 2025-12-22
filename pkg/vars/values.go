@@ -2,14 +2,20 @@ package vars
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 type (
 	Configuration interface {
+		GetNonRequiredStringValue(param string) string
+		GetNonRequiredIntValue(param string) int
+
 		GetStringValue(param string) string
 		GetIntValue(param string) int
 		GetStringValueDefault(param string, _default string) string
@@ -65,20 +71,20 @@ func NewConfiguration(repository string, context string) Configuration {
 	}
 }
 
-func (c *configuration) GetStringValue(param string) string {
+func (c *configuration) getNonRequiredStringValue(param string) (string, error) {
 	if v, ok := c.readSecretStoreVar(param); ok {
-		return v
+		return v, nil
 	}
 	if val := os.Getenv(param); val != "" {
-		return val
+		return val, nil
 	}
 	if v, ok := readDotEnvVar(param); ok {
-		return v
+		return v, nil
 	}
-	panic("environment variable " + param + " is not set")
+	return "", errors.New("errors reading environment variable")
 }
 
-func (c *configuration) getIntValue(param string) *int {
+func (c *configuration) getNonRequiredIntValue(param string) (*int, error) {
 	var val string
 	if v, ok := c.readSecretStoreVar(param); ok {
 		val = v
@@ -87,18 +93,43 @@ func (c *configuration) getIntValue(param string) *int {
 	} else if v, ok := readDotEnvVar(param); ok {
 		val = v
 	} else {
-		return nil
+		return nil, errors.New("errors reading environment variable")
 	}
 	intVal, err := strconv.Atoi(val)
 	if err != nil {
 		panic("environment variable " + param + " is not a valid integer")
 	}
-	return &intVal
+	return &intVal, nil
+}
+
+func (c *configuration) GetNonRequiredStringValue(param string) string {
+	result, err := c.getNonRequiredStringValue(param)
+	if err != nil {
+		logrus.Errorf("error reading environment variable %s: %s", param, err)
+	}
+	return result
+}
+
+func (c *configuration) GetNonRequiredIntValue(param string) int {
+	result, err := c.getNonRequiredIntValue(param)
+	if err != nil {
+		logrus.Errorf("error reading environment variable %s: %s", param, err)
+		return 0
+	}
+	return *result
+}
+
+func (c *configuration) GetStringValue(param string) string {
+	result, err := c.getNonRequiredStringValue(param)
+	if err != nil {
+		logrus.Panicf("error reading environment variable %s: %s", param, err)
+	}
+	return result
 }
 
 func (c *configuration) GetIntValue(param string) int {
-	val := c.getIntValue(param)
-	if val == nil {
+	val, err := c.getNonRequiredIntValue(param)
+	if err != nil {
 		panic("environment variable " + param + " is not set")
 	}
 	return *val
@@ -118,8 +149,8 @@ func (c *configuration) GetStringValueDefault(param string, _default string) str
 }
 
 func (c *configuration) GetIntValueDefault(param string, _default int) int {
-	val := c.getIntValue(param)
-	if val == nil {
+	val, err := c.getNonRequiredIntValue(param)
+	if err != nil {
 		return _default
 	}
 	return *val
