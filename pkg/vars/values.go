@@ -30,6 +30,7 @@ type (
 	configuration struct {
 		repository string
 		context    string
+		envFile    string
 	}
 )
 
@@ -65,9 +66,14 @@ func (c *configuration) CheckMount() []string {
 }
 
 func NewConfiguration(repository string, context string) Configuration {
+	return NewConfigurationWithEnv(repository, context, ".env")
+}
+
+func NewConfigurationWithEnv(repository string, context string, envFile string) Configuration {
 	return &configuration{
 		repository: repository,
 		context:    context,
+		envFile:    envFile,
 	}
 }
 
@@ -75,11 +81,11 @@ func (c *configuration) getNonRequiredStringValue(param string) (string, error) 
 	if v, ok := c.readSecretStoreVar(param); ok {
 		return v, nil
 	}
+	if v, ok := readDotEnvVar(param, c.envFile); ok {
+		return v, nil
+	}
 	if val := os.Getenv(param); val != "" {
 		return val, nil
-	}
-	if v, ok := readDotEnvVar(param); ok {
-		return v, nil
 	}
 	return "", errors.New("errors reading environment variable")
 }
@@ -90,7 +96,7 @@ func (c *configuration) getNonRequiredIntValue(param string) (*int, error) {
 		val = v
 	} else if v := os.Getenv(param); v != "" {
 		val = v
-	} else if v, ok := readDotEnvVar(param); ok {
+	} else if v, ok := readDotEnvVar(param, c.envFile); ok {
 		val = v
 	} else {
 		return nil, errors.New("errors reading environment variable")
@@ -142,7 +148,7 @@ func (c *configuration) GetStringValueDefault(param string, _default string) str
 	if val := os.Getenv(param); val != "" {
 		return val
 	}
-	if v, ok := readDotEnvVar(param); ok {
+	if v, ok := readDotEnvVar(param, c.envFile); ok {
 		return v
 	}
 	return _default
@@ -162,7 +168,7 @@ func (c *configuration) getFloat64Value(param string) *float64 {
 		val = v
 	} else if v := os.Getenv(param); v != "" {
 		val = v
-	} else if v, ok := readDotEnvVar(param); ok {
+	} else if v, ok := readDotEnvVar(param, c.envFile); ok {
 		val = v
 	} else {
 		return nil
@@ -197,7 +203,7 @@ func (c *configuration) IsDebugEnabled() bool {
 	if val := os.Getenv("DEBUG"); val != "" {
 		return strings.ToLower(strings.TrimSpace(val)) == "true"
 	}
-	if v, ok := readDotEnvVar("DEBUG"); ok {
+	if v, ok := readDotEnvVar("DEBUG", c.envFile); ok {
 		return strings.ToLower(strings.TrimSpace(v)) == "true"
 	}
 	return false
@@ -210,7 +216,7 @@ func (c *configuration) IsProduction() bool {
 	if val := os.Getenv("ENVIRONMENT"); val != "" {
 		return strings.ToLower(strings.TrimSpace(val)) == "production"
 	}
-	if v, ok := readDotEnvVar("ENVIRONMENT"); ok {
+	if v, ok := readDotEnvVar("ENVIRONMENT", c.envFile); ok {
 		return strings.ToLower(strings.TrimSpace(v)) == "production"
 	}
 	return false
@@ -234,8 +240,8 @@ func (c *configuration) readSecretStoreVar(param string) (string, bool) {
 	return val, true
 }
 
-func readDotEnvVar(param string) (string, bool) {
-	f, err := os.Open(".env")
+func readDotEnvVar(param string, file string) (string, bool) {
+	f, err := os.Open(file)
 	if err != nil {
 		return "", false
 	}
