@@ -237,6 +237,7 @@ func (c *configuration) readSecretStoreVar(param string) (string, bool) {
 	}
 
 	val := strings.TrimSpace(string(data))
+	logrus.Debugf("Read secret %s from path %s", param, path)
 	return val, true
 }
 
